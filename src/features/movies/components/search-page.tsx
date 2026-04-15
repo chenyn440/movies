@@ -11,13 +11,14 @@ import { toAppError } from "@/shared/types/app-error";
 import { ErrorNotice } from "@/shared/ui/error-notice";
 import { Input } from "@/shared/ui/input";
 import { LoadingIndicator, MovieGridSkeleton } from "@/shared/ui/loading-indicator";
+import { getFallbackPopularMovies } from "@/features/movies/lib/fallback-movies";
 
 type SearchSort = "default" | "rating_desc" | "release_desc" | "title_asc";
 const SORT_OPTIONS: Array<{ value: SearchSort; label: string }> = [
-  { value: "default", label: "預設" },
-  { value: "rating_desc", label: "評分：高到低" },
-  { value: "release_desc", label: "上映：新到舊" },
-  { value: "title_asc", label: "片名：A-Z" },
+  { value: "default", label: "默认" },
+  { value: "rating_desc", label: "评分：高到低" },
+  { value: "release_desc", label: "上映：新到旧" },
+  { value: "title_asc", label: "片名：字母顺序" },
 ];
 
 function toDateScore(value: string | null) {
@@ -43,7 +44,7 @@ export function SearchPage() {
     initialPageParam: 1,
     queryFn: ({ pageParam, signal }) => {
       if (!auth) {
-        throw new Error("TMDB auth is required.");
+        throw new Error("需要先设置 TMDB 验证。");
       }
 
       if (!trimmedQuery) {
@@ -92,7 +93,12 @@ export function SearchPage() {
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   const movies = result.data?.pages.flatMap((page) => page.results) ?? [];
-  const visibleMovies = [...movies];
+  const appError = result.error ? toAppError(result.error) : null;
+  const shouldUseFallbackPopular = !trimmedQuery && Boolean(appError);
+  const fallbackMovies = shouldUseFallbackPopular
+    ? getFallbackPopularMovies().results
+    : [];
+  const visibleMovies = [...(shouldUseFallbackPopular ? fallbackMovies : movies)];
   if (sort === "rating_desc") {
     visibleMovies.sort(
       (a, b) => (b.voteAverage ?? Number.NEGATIVE_INFINITY) - (a.voteAverage ?? Number.NEGATIVE_INFINITY),
@@ -102,22 +108,18 @@ export function SearchPage() {
   } else if (sort === "title_asc") {
     visibleMovies.sort((a, b) => a.title.localeCompare(b.title, "zh-Hans-CN"));
   }
-  const appError = result.error ? toAppError(result.error) : null;
-
   return (
     <section className="space-y-4">
       <header className="glass-surface rounded-[var(--radius-lg)] p-4 md:p-6">
-        <p className="text-sm uppercase tracking-[0.24em] text-[var(--text-muted)]">
-          Movies To Watch
-        </p>
-        <h1 className="mt-1 text-5xl text-[var(--text)] md:text-6xl">搜尋電影</h1>
+        <p className="text-sm tracking-[0.16em] text-[var(--text-muted)]">电影待看清单</p>
+        <h1 className="mt-1 text-5xl text-[var(--text)] md:text-6xl">搜索电影</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          支援無限滾動、電影詳情、待看清單收藏與排序。未輸入關鍵字時預設顯示熱門電影。
+          支持无限滚动、电影详情、待看清单收藏与排序。未输入关键词时默认显示热门电影。
         </p>
         <div className="mt-4">
           <Input
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="輸入電影名稱，例如：Inception"
+            placeholder="输入电影名称，例如：星际穿越"
             value={query}
           />
         </div>
@@ -143,30 +145,36 @@ export function SearchPage() {
 
       {!auth ? (
         <ErrorNotice
-          message="請先透過右上角「設定 API Key」輸入 TMDB 金鑰後再搜尋。"
-          title="尚未設定 TMDB API Key"
+          message="请先通过右上角“设置 API 密钥”输入 TMDB 密钥后再搜索。"
+          title="尚未设置 TMDB 密钥"
         />
       ) : null}
 
       {auth && trimmedQuery.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)]">
-          目前顯示熱門電影。你也可以輸入關鍵字搜尋，例如 `Interstellar` 或 `The Batman`。
+          当前显示热门电影。你也可以输入关键词搜索，例如 `星际穿越` 或 `蝙蝠侠`。
         </p>
       ) : null}
 
       {result.isPending && <MovieGridSkeleton />}
 
-      {appError ? (
+      {appError && trimmedQuery ? (
         <ErrorNotice
           message={appError.message}
           onAction={() => void result.refetch()}
-          title="搜尋發生錯誤"
+          title="搜索发生错误"
         />
+      ) : null}
+
+      {shouldUseFallbackPopular ? (
+        <div className="glass-surface rounded-[var(--radius-md)] p-4 text-sm text-[var(--text-muted)]">
+          当前网络无法直接获取 TMDB 热门电影，已为你展示一组内置推荐片单。
+        </div>
       ) : null}
 
       {!result.isPending && !appError && movies.length === 0 && trimmedQuery ? (
         <div className="glass-surface rounded-[var(--radius-md)] p-4 text-sm text-[var(--text-muted)]">
-          找不到與「{trimmedQuery}」相關的結果。
+          找不到与“{trimmedQuery}”相关的结果。
         </div>
       ) : null}
 
@@ -179,7 +187,7 @@ export function SearchPage() {
       ) : null}
 
       <div ref={sentinelRef} />
-      {isFetchingNextPage ? <LoadingIndicator label="載入更多電影..." /> : null}
+      {isFetchingNextPage ? <LoadingIndicator label="加载更多电影..." /> : null}
     </section>
   );
 }
