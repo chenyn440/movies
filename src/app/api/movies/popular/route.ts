@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getFallbackPopularMovies } from "@/features/movies/lib/fallback-movies";
 import { getPopularCache } from "@/server/movie-cache-service";
 
 export const runtime = "nodejs";
@@ -12,8 +13,14 @@ export async function GET(request: Request) {
 
   if (!cached) {
     return NextResponse.json(
-      { error: "热门电影缓存暂不可用" },
-      { status: 503 },
+      {
+        data: getFallbackPopularMovies(normalizedPage),
+        meta: {
+          source: "tmdb-fallback",
+          stale: true,
+        },
+      },
+      { status: 200 },
     );
   }
 

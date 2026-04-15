@@ -14,7 +14,6 @@ import { toAppError } from "@/shared/types/app-error";
 import { ErrorNotice } from "@/shared/ui/error-notice";
 import { Input } from "@/shared/ui/input";
 import { LoadingIndicator, MovieGridSkeleton } from "@/shared/ui/loading-indicator";
-import { getFallbackPopularMovies } from "@/features/movies/lib/fallback-movies";
 import { rememberMovies } from "@/features/movies/lib/movie-cache";
 
 type SearchSort = "default" | "rating_desc" | "release_desc" | "title_asc";
@@ -108,12 +107,8 @@ export function SearchPage() {
     [result.data],
   );
   const appError = result.error ? toAppError(result.error) : null;
-  const shouldUseFallbackPopular = !trimmedQuery && Boolean(appError);
   const visibleMovies = useMemo(() => {
-    const baseMovies = shouldUseFallbackPopular
-      ? getFallbackPopularMovies().results
-      : movies;
-    const nextMovies = [...baseMovies];
+    const nextMovies = [...movies];
     if (sort === "rating_desc") {
       nextMovies.sort(
         (a, b) =>
@@ -128,7 +123,7 @@ export function SearchPage() {
       nextMovies.sort((a, b) => a.title.localeCompare(b.title, "zh-Hans-CN"));
     }
     return nextMovies;
-  }, [movies, shouldUseFallbackPopular, sort]);
+  }, [movies, sort]);
 
   useEffect(() => {
     if (visibleMovies.length > 0) {
@@ -200,9 +195,9 @@ export function SearchPage() {
         />
       ) : null}
 
-      {shouldUseFallbackPopular ? (
+      {!trimmedQuery && popularMeta?.source === "tmdb-fallback" ? (
         <div className="glass-surface rounded-[var(--radius-md)] p-4 text-sm text-[var(--text-muted)]">
-          当前网络无法直接获取 TMDB 热门电影，已为你展示一组内置推荐片单。
+          当前网络无法直接获取 TMDB 热门电影，已为你展示本站预置片单。
         </div>
       ) : null}
 

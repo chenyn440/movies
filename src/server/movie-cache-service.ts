@@ -31,6 +31,7 @@ type CachedMovieRow = {
 };
 
 const POPULAR_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const POPULAR_CACHE_PAGE_SIZE = 20;
 
 function parseJsonArray<T>(value: string): T[] {
   try {
@@ -76,6 +77,10 @@ function isStale(cachedAt: string) {
 
 export function getPopularCache(page = 1): CachedPopularResult | null {
   const db = getAppDb();
+  const totalCountRow = db
+    .prepare(`SELECT COUNT(*) AS count FROM movie_cache_popular`)
+    .get() as { count: number } | undefined;
+  const totalResults = totalCountRow?.count ?? 0;
   const rows = db
     .prepare(
       `SELECT
@@ -113,8 +118,8 @@ export function getPopularCache(page = 1): CachedPopularResult | null {
   return {
     data: {
       page,
-      totalPages: 1,
-      totalResults: rows.length,
+      totalPages: Math.max(1, Math.ceil(totalResults / POPULAR_CACHE_PAGE_SIZE)),
+      totalResults,
       results: rows.map((row) => mapMovieSummary(row)),
     },
     meta: {
@@ -224,4 +229,8 @@ export function replacePopularCache(page: number, movies: MovieDetail[], cachedA
 
 export function getPopularCacheTtlMs() {
   return POPULAR_CACHE_TTL_MS;
+}
+
+export function getPopularCachePageSize() {
+  return POPULAR_CACHE_PAGE_SIZE;
 }

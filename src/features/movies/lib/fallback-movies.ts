@@ -124,14 +124,140 @@ const FALLBACK_MOVIE_DETAILS: MovieDetail[] = [
     trailers: [],
     reviews: [],
   },
+  {
+    id: 238,
+    title: "教父",
+    posterPath: "/3bhkrj58Vtu7enYsRolD1fZdja1.jpg",
+    backdropPath: "/tmU7GeKVybMWFButWEGl2M4GeiP.jpg",
+    releaseDate: "1972-03-14",
+    voteAverage: 8.7,
+    overview: "黑手党家族在权力、忠诚与传承之间走向命运分岔口。",
+    genres: ["剧情", "犯罪"],
+    runtime: 175,
+    tagline: "我会给他一个无法拒绝的条件。",
+    director: "弗朗西斯·福特·科波拉",
+    cast: [],
+    trailers: [],
+    reviews: [],
+  },
+  {
+    id: 680,
+    title: "低俗小说",
+    posterPath: "/vQWk5YBFWF4bZaofAbv0tShwBvQ.jpg",
+    backdropPath: "/suaEOtk1N1sgg2MTM7oZd2cfVp3.jpg",
+    releaseDate: "1994-09-10",
+    voteAverage: 8.5,
+    overview: "几段交错展开的犯罪故事，拼成一部节奏凌厉的黑色传奇。",
+    genres: ["惊悚", "犯罪"],
+    runtime: 154,
+    tagline: "你得知道地球上有奇迹这回事。",
+    director: "昆汀·塔伦蒂诺",
+    cast: [],
+    trailers: [],
+    reviews: [],
+  },
+  {
+    id: 240,
+    title: "教父2",
+    posterPath: "/hek3koDUyRQk7FIhPXsa6mT2Zc3.jpg",
+    backdropPath: "/kGzFbGhp99zva6oZODW5atUtnqi.jpg",
+    releaseDate: "1974-12-20",
+    voteAverage: 8.6,
+    overview: "迈克尔继续扩张家族势力，同时回溯维托的崛起往事。",
+    genres: ["剧情", "犯罪"],
+    runtime: 202,
+    tagline: "权力只会让人更孤独。",
+    director: "弗朗西斯·福特·科波拉",
+    cast: [],
+    trailers: [],
+    reviews: [],
+  },
+  {
+    id: 424,
+    title: "辛德勒的名单",
+    posterPath: "/sF1U4EUQS8YHUYjNl3pMGNIQyr0.jpg",
+    backdropPath: "/zb6fM1CX41D9rF9hdgclu0peUmy.jpg",
+    releaseDate: "1993-12-15",
+    voteAverage: 8.6,
+    overview: "商人辛德勒在战争阴影下尽力拯救犹太工人的生命。",
+    genres: ["剧情", "历史", "战争"],
+    runtime: 195,
+    tagline: "拯救一个人，就是拯救整个世界。",
+    director: "史蒂文·斯皮尔伯格",
+    cast: [],
+    trailers: [],
+    reviews: [],
+  },
+  {
+    id: 129,
+    title: "千与千寻",
+    posterPath: "/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg",
+    backdropPath: "/mnpRKVSXBX6jb56nabvmGKA0Wig.jpg",
+    releaseDate: "2001-07-20",
+    voteAverage: 8.5,
+    overview: "少女误入神灵世界，在成长中寻找名字、勇气与归途。",
+    genres: ["动画", "奇幻", "家庭"],
+    runtime: 125,
+    tagline: "不要回头，一直往前走。",
+    director: "宫崎骏",
+    cast: [],
+    trailers: [],
+    reviews: [],
+  },
+  {
+    id: 19404,
+    title: "地心引力",
+    posterPath: "/kZ2nZw8D681aphje8NJi8EfbL1U.jpg",
+    backdropPath: "/rjNoiRiqttA0QsvkA8Vq3xap0HO.jpg",
+    releaseDate: "2013-10-03",
+    voteAverage: 7.2,
+    overview: "两名宇航员在太空灾难后设法重返地球，孤独与求生交织。",
+    genres: ["科幻", "惊悚"],
+    runtime: 91,
+    tagline: "别放手。",
+    director: "阿方索·卡隆",
+    cast: [],
+    trailers: [],
+    reviews: [],
+  },
 ];
 
-export function getFallbackPopularMovies(): PagedResult<MovieSummary> {
+const FALLBACK_PAGE_SIZE = 6;
+const FALLBACK_TARGET_SIZE = 100;
+
+function buildRepeatedFallbackDetails() {
+  const repeated: MovieDetail[] = [];
+  for (let index = 0; index < FALLBACK_TARGET_SIZE; index += 1) {
+    const sourceIndex = index % FALLBACK_MOVIE_DETAILS.length;
+    const source = FALLBACK_MOVIE_DETAILS[sourceIndex];
+    if (!source) {
+      continue;
+    }
+    const batch = Math.floor(index / FALLBACK_MOVIE_DETAILS.length);
+    repeated.push({
+      ...source,
+      id: source.id + batch * 100000,
+      title: batch === 0 ? source.title : `${source.title} ${batch + 1}`,
+    });
+  }
+  return repeated;
+}
+
+const FALLBACK_POPULAR_DETAILS = buildRepeatedFallbackDetails();
+
+export function getFallbackPopularMovies(page = 1): PagedResult<MovieSummary> {
+  const normalizedPage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const startIndex = (normalizedPage - 1) * FALLBACK_PAGE_SIZE;
+  const pageItems = FALLBACK_POPULAR_DETAILS.slice(
+    startIndex,
+    startIndex + FALLBACK_PAGE_SIZE,
+  );
+
   return {
-    page: 1,
-    totalPages: 1,
-    totalResults: FALLBACK_MOVIE_DETAILS.length,
-    results: FALLBACK_MOVIE_DETAILS.map((movie) => ({
+    page: normalizedPage,
+    totalPages: Math.max(1, Math.ceil(FALLBACK_POPULAR_DETAILS.length / FALLBACK_PAGE_SIZE)),
+    totalResults: FALLBACK_POPULAR_DETAILS.length,
+    results: pageItems.map((movie) => ({
       id: movie.id,
       title: movie.title,
       posterPath: movie.posterPath,

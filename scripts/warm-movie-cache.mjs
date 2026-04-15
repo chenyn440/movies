@@ -8,7 +8,7 @@ const DEFAULT_TMDB_BEARER_TOKEN =
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const TMDB_LANGUAGE = "zh-CN";
 const TMDB_FALLBACK_LANGUAGE = "en-US";
-const PAGE = 1;
+const MAX_POPULAR_PAGES = 5;
 
 function resolveDbPath() {
   const envPath = process.env.APP_DB_PATH?.trim();
@@ -209,16 +209,24 @@ async function main() {
 
   const db = createDb();
   const cachedAt = new Date().toISOString();
-  const popular = await requestTmdb("/movie/popular", apiKey, {
-    page: PAGE,
-    language: TMDB_LANGUAGE,
-  });
+  const pageEntries = [];
+  for (let page = 1; page <= MAX_POPULAR_PAGES; page += 1) {
+    const popular = await requestTmdb("/movie/popular", apiKey, {
+      page,
+      language: TMDB_LANGUAGE,
+    });
 
-  const ids = Array.isArray(popular.results)
-    ? popular.results
-        .map((item) => Number(item?.id))
-        .filter((id) => Number.isFinite(id) && id > 0)
-    : [];
+    const ids = Array.isArray(popular.results)
+      ? popular.results
+          .map((item) => Number(item?.id))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      : [];
+    pageEntries.push({ page, ids });
+  }
+
+  const ids = Array.from(
+    new Set(pageEntries.flatMap((entry) => entry.ids)),
+  );
   const details = [];
   for (const id of ids) {
     const detail = await fetchMovieDetail(apiKey, id);
@@ -251,7 +259,7 @@ async function main() {
       reviews_json = excluded.reviews_json,
       fetched_at = excluded.fetched_at`,
   );
-  const deletePopular = db.prepare(`DELETE FROM movie_cache_popular WHERE page = ?`);
+  const deletePopular = db.prepare(`DELETE FROM movie_cache_popular`);
   const insertPopular = db.prepare(
     `INSERT INTO movie_cache_popular (page, movie_id, sort_order, cached_at)
       VALUES (?, ?, ?, ?)`,
@@ -278,14 +286,18 @@ async function main() {
       });
     }
 
-    deletePopular.run(PAGE);
-    details.forEach((movie, index) => {
-      insertPopular.run(PAGE, movie.id, index, cachedAt);
+    deletePopular.run();
+    pageEntries.forEach((entry) => {
+      entry.ids.forEach((movieId, index) => {
+        insertPopular.run(entry.page, movieId, index, cachedAt);
+      });
     });
   });
 
   tx();
-  console.log(`Warmed ${details.length} popular movies into ${resolveDbPath()}`);
+  console.log(
+    `Warmed ${details.length} popular movies across ${pageEntries.length} pages into ${resolveDbPath()}`,
+  );
 }
 
 main().catch((error) => {
