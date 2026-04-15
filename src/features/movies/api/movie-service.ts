@@ -1,4 +1,5 @@
 import type { TmdbAuth } from "@/features/settings/lib/tmdb-auth";
+import type { MovieDetail, MovieSummary, PagedResult } from "@/features/movies/types";
 import { mapMovieDetailResponse, mapMovieSearchResponse } from "./mappers";
 import { requestTmdb } from "./tmdb-client";
 
@@ -18,6 +19,15 @@ type MovieDetailArgs = {
   auth: TmdbAuth;
   id: number;
   signal?: AbortSignal;
+};
+
+type CachedPopularResponse = {
+  data: PagedResult<MovieSummary>;
+  meta: {
+    source: "cache" | "stale-cache" | "tmdb-fallback";
+    cachedAt?: string;
+    stale?: boolean;
+  };
 };
 
 type CreditCandidate = {
@@ -270,4 +280,60 @@ export async function getPopularMovies({
   });
 
   return mapMovieSearchResponse(payload);
+}
+
+export async function getCachedPopularMovies({
+  page,
+  signal,
+}: {
+  page: number;
+  signal?: AbortSignal;
+}) {
+  const endpoint =
+    typeof window === "undefined"
+      ? `http://127.0.0.1:3000/api/movies/popular?page=${page}`
+      : `/api/movies/popular?page=${page}`;
+  const requestInit: RequestInit = {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+  };
+  if (signal) {
+    requestInit.signal = signal;
+  }
+
+  const response = await fetch(endpoint, requestInit);
+
+  const payload = (await response.json().catch(() => null)) as CachedPopularResponse | null;
+  if (!response.ok || !payload?.data) {
+    throw new Error("热门电影缓存暂不可用");
+  }
+
+  return payload;
+}
+
+export async function getCachedMovieDetail(movieId: number, signal?: AbortSignal) {
+  const endpoint =
+    typeof window === "undefined"
+      ? `http://127.0.0.1:3000/api/movies/${movieId}`
+      : `/api/movies/${movieId}`;
+  const requestInit: RequestInit = {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+  };
+  if (signal) {
+    requestInit.signal = signal;
+  }
+
+  const response = await fetch(endpoint, requestInit);
+
+  const payload = (await response.json().catch(() => null)) as { data?: MovieDetail } | null;
+  if (!response.ok || !payload?.data) {
+    throw new Error("电影详情缓存暂不可用");
+  }
+
+  return payload.data;
 }

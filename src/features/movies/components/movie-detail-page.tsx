@@ -2,7 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
-import { getMovieDetail } from "@/features/movies/api/movie-service";
+import {
+  getCachedMovieDetail as getCachedMovieDetailFromApi,
+  getMovieDetail,
+} from "@/features/movies/api/movie-service";
 import { getFallbackMovieDetail } from "@/features/movies/lib/fallback-movies";
 import { getCachedMovieDetail } from "@/features/movies/lib/movie-cache";
 import { buildPosterUrl } from "@/features/movies/api/tmdb-client";
@@ -32,11 +35,16 @@ export function MovieDetailPage({ movieId }: MovieDetailPageProps) {
   const result = useQuery({
     queryKey: ["movie-detail", movieId, authFingerprint],
     enabled: Boolean(auth),
-    queryFn: ({ signal }) => {
+    queryFn: async ({ signal }) => {
       if (!auth) {
         throw new Error("需要先设置 TMDB 验证。");
       }
-      return getMovieDetail({ auth, id: movieId, signal });
+
+      try {
+        return await getCachedMovieDetailFromApi(movieId, signal);
+      } catch {
+        return getMovieDetail({ auth, id: movieId, signal });
+      }
     },
   });
   const fallbackMovie = getFallbackMovieDetail(movieId) ?? getCachedMovieDetail(movieId);

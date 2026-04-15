@@ -2,7 +2,10 @@
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getPopularMovies, searchMovies } from "@/features/movies/api/movie-service";
+import {
+  getCachedPopularMovies,
+  searchMovies,
+} from "@/features/movies/api/movie-service";
 import { MovieCard } from "@/features/movies/components/movie-card";
 import { cn } from "@/shared/lib/cn";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
@@ -38,6 +41,11 @@ export function SearchPage() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const trimmedQuery = debouncedQuery.trim();
   const authFingerprint = auth ? `${auth.mode}:${auth.value.slice(0, 6)}` : "none";
+  const [popularMeta, setPopularMeta] = useState<{
+    source: "cache" | "stale-cache" | "tmdb-fallback";
+    cachedAt?: string;
+    stale?: boolean;
+  } | null>(null);
 
   const result = useInfiniteQuery({
     queryKey: ["movie-search", trimmedQuery, authFingerprint],
@@ -49,10 +57,12 @@ export function SearchPage() {
       }
 
       if (!trimmedQuery) {
-        return getPopularMovies({
-          auth,
+        return getCachedPopularMovies({
           page: Number(pageParam),
           signal,
+        }).then((payload) => {
+          setPopularMeta(payload.meta);
+          return payload.data;
         });
       }
 
@@ -172,6 +182,12 @@ export function SearchPage() {
         <p className="text-sm text-[var(--text-muted)]">
           当前显示热门电影。你也可以输入关键词搜索，例如 `星际穿越` 或 `蝙蝠侠`。
         </p>
+      ) : null}
+
+      {!trimmedQuery && popularMeta?.source === "stale-cache" ? (
+        <div className="glass-surface rounded-[var(--radius-md)] p-4 text-sm text-[var(--text-muted)]">
+          当前展示的是缓存热门电影，可能不是最新数据。
+        </div>
       ) : null}
 
       {result.isPending && <MovieGridSkeleton />}
