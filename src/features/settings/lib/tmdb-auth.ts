@@ -26,12 +26,14 @@ function decodeBase64Url(value: string) {
 export function extractApiKeyFromBearerToken(token: string) {
   const trimmed = token.trim();
   const parts = trimmed.split(".");
-  if (parts.length < 2) {
+  const payloadPart = parts[1];
+
+  if (!payloadPart) {
     return null;
   }
 
   try {
-    const decoded = decodeBase64Url(parts[1]);
+    const decoded = decodeBase64Url(payloadPart);
     if (!decoded) {
       return null;
     }
