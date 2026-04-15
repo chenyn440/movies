@@ -31,7 +31,7 @@ type CachedMovieRow = {
 };
 
 const POPULAR_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
-const POPULAR_CACHE_PAGE_SIZE = 20;
+const POPULAR_CACHE_PAGE_SIZE = 10;
 
 function parseJsonArray<T>(value: string): T[] {
   try {

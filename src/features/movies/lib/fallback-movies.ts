@@ -222,7 +222,7 @@ const FALLBACK_MOVIE_DETAILS: MovieDetail[] = [
   },
 ];
 
-const FALLBACK_PAGE_SIZE = 6;
+const FALLBACK_PAGE_SIZE = 10;
 const FALLBACK_TARGET_SIZE = 100;
 
 function buildRepeatedFallbackDetails() {
