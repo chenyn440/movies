@@ -93,14 +93,17 @@ export function SearchPage() {
     };
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  const movies = result.data?.pages.flatMap((page) => page.results) ?? [];
+  const movies = useMemo(
+    () => result.data?.pages.flatMap((page) => page.results) ?? [],
+    [result.data],
+  );
   const appError = result.error ? toAppError(result.error) : null;
   const shouldUseFallbackPopular = !trimmedQuery && Boolean(appError);
-  const fallbackMovies = shouldUseFallbackPopular
-    ? getFallbackPopularMovies().results
-    : [];
   const visibleMovies = useMemo(() => {
-    const nextMovies = [...(shouldUseFallbackPopular ? fallbackMovies : movies)];
+    const baseMovies = shouldUseFallbackPopular
+      ? getFallbackPopularMovies().results
+      : movies;
+    const nextMovies = [...baseMovies];
     if (sort === "rating_desc") {
       nextMovies.sort(
         (a, b) =>
@@ -115,7 +118,7 @@ export function SearchPage() {
       nextMovies.sort((a, b) => a.title.localeCompare(b.title, "zh-Hans-CN"));
     }
     return nextMovies;
-  }, [fallbackMovies, movies, shouldUseFallbackPopular, sort]);
+  }, [movies, shouldUseFallbackPopular, sort]);
 
   useEffect(() => {
     if (visibleMovies.length > 0) {
