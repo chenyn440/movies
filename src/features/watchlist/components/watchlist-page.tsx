@@ -13,12 +13,13 @@ import { Button } from "@/shared/ui/button";
 import { Modal } from "@/shared/ui/modal";
 
 const SORT_OPTIONS: Array<{ value: WatchlistSort; label: string }> = [
-  { value: "added_desc", label: "加入時間：新到舊" },
-  { value: "added_asc", label: "加入時間：舊到新" },
+  { value: "added_desc", label: "加入时间：新到旧" },
+  { value: "added_asc", label: "加入时间：旧到新" },
 ];
 
 export function WatchlistPage() {
-  const { watchlist, removeMovieFromWatchlist } = useAppState();
+  const { watchlist, removeMovieFromWatchlist, isLoggedIn, openLoginModal } =
+    useAppState();
   const [sort, setSort] = useState<WatchlistSort>("added_desc");
   const [targetMovie, setTargetMovie] = useState<WatchlistItem | null>(null);
   const [shouldRecommend, setShouldRecommend] = useState(false);
@@ -72,7 +73,7 @@ export function WatchlistPage() {
         });
       } catch (error) {
         setActionError(
-          error instanceof Error ? error.message : "保存推薦資料失敗",
+          error instanceof Error ? error.message : "保存推荐数据失败",
         );
         return;
       }
@@ -88,14 +89,14 @@ export function WatchlistPage() {
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
             <h1 className="text-[clamp(2.6rem,10.5vw,4.5rem)] leading-none text-[var(--text)] md:text-6xl">
-              待看清單
+              待看清单
             </h1>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              已收藏 {sorted.length} 部電影，可設為已看並選擇加入推薦廣場。
+              已收藏 {sorted.length} 部电影，可设为已看并选择加入推荐广场。
             </p>
             <div className="mt-3">
               <Link href="/watchlist/lottery">
-                <Button type="button">Watch Lottery</Button>
+                <Button type="button">待看抽签</Button>
               </Link>
             </div>
           </div>
@@ -125,13 +126,24 @@ export function WatchlistPage() {
         </div>
       </header>
 
-      {sorted.length === 0 ? (
+      {!isLoggedIn ? (
         <div className="glass-surface rounded-[var(--radius-md)] p-6 text-sm text-[var(--text-muted)]">
-          還沒有加入待看電影，先到
+          请先登录再管理待看清单。
+          <button
+            className="ml-2 text-[var(--primary)] underline"
+            onClick={openLoginModal}
+            type="button"
+          >
+            立即登录
+          </button>
+        </div>
+      ) : sorted.length === 0 ? (
+        <div className="glass-surface rounded-[var(--radius-md)] p-6 text-sm text-[var(--text-muted)]">
+          还没有加入待看电影，先到
           <Link className="mx-1 text-[var(--primary)] underline" href="/">
-            搜尋頁
+            搜索页
           </Link>
-          收藏幾部吧。
+          收藏几部吧。
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
@@ -151,8 +163,8 @@ export function WatchlistPage() {
           saveRecommendationMutation.isPending ||
           (shouldRecommend && recommendReason.length > 500)
         }
-        confirmLabel="確認"
-        description="確認後會從待看清單移除。你可以選擇是否加入推薦廣場。"
+        confirmLabel="确认"
+        description="确认后会从待看清单移除。你可以选择是否加入推荐广场。"
         onConfirm={() => {
           void handleConfirmWatched();
         }}
@@ -163,7 +175,7 @@ export function WatchlistPage() {
         }}
         open={Boolean(targetMovie)}
         pending={saveRecommendationMutation.isPending}
-        title={targetMovie ? `《${targetMovie.title}》已看完` : "設為已看"}
+        title={targetMovie ? `《${targetMovie.title}》已看完` : "设为已看"}
       >
         <div className="space-y-3">
           <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
@@ -173,17 +185,17 @@ export function WatchlistPage() {
               onChange={(event) => setShouldRecommend(event.target.checked)}
               type="checkbox"
             />
-            同步加入推薦廣場
+            同步加入推荐广场
           </label>
 
           <div className={cn(!shouldRecommend && "opacity-45")}>
-            <p className="mb-1 text-sm text-[var(--text-muted)]">推薦理由（可選）</p>
+            <p className="mb-1 text-sm text-[var(--text-muted)]">推荐理由（可选）</p>
             <textarea
-              className="h-24 w-full resize-none rounded-[var(--radius-sm)] border border-white/12 bg-black/25 px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className="h-24 w-full resize-none rounded-[var(--radius-sm)] border border-white/12 bg-black/25 px-3 py-2 text-base text-[var(--text)] placeholder:text-[var(--text-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] md:text-sm"
               disabled={!shouldRecommend}
               maxLength={500}
               onChange={(event) => setRecommendReason(event.target.value)}
-              placeholder="例如：節奏明快、配樂很棒、懸念感十足..."
+              placeholder="例如：节奏明快、配乐很棒、悬念感十足..."
               value={recommendReason}
             />
             <p className="mt-1 text-right text-xs text-[var(--text-soft)]">
