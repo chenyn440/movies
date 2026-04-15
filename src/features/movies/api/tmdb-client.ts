@@ -14,6 +14,8 @@ export class TmdbApiError extends Error {
   }
 }
 
+const TMDB_REQUEST_TIMEOUT_MS = 12000;
+
 type PrimitiveQuery = string | number | boolean | null | undefined;
 
 type RequestTmdbOptions = {
@@ -50,6 +52,13 @@ export async function requestTmdb<T>(
     Accept: "application/json",
   });
 
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => {
+    abortController.abort(
+      new DOMException("TMDB 请求超时，请检查网络连接。", "AbortError"),
+    );
+  }, TMDB_REQUEST_TIMEOUT_MS);
+
   if (options.auth.mode === "bearer") {
     headers.set("Authorization", `Bearer ${options.auth.value}`);
   }
@@ -57,13 +66,32 @@ export async function requestTmdb<T>(
   const requestInit: RequestInit = {
     method: "GET",
     headers,
+    signal: abortController.signal,
   };
 
   if (options.signal) {
-    requestInit.signal = options.signal;
+    options.signal.addEventListener(
+      "abort",
+      () => {
+        abortController.abort(options.signal?.reason);
+      },
+      { once: true },
+    );
   }
 
-  const response = await fetch(url, requestInit);
+  let response: Response;
+  try {
+    response = await fetch(url, requestInit);
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("电影数据请求超时，请稍后重试或检查网络。");
+    }
+
+    throw new Error("电影数据请求失败，请检查网络或稍后重试。");
+  }
+  clearTimeout(timeoutId);
 
   const text = await response.text();
   let payload: unknown = null;
@@ -99,5 +127,11 @@ export function buildPosterUrl(path: string | null, size = "w500") {
   if (!path) {
     return null;
   }
-  return `https://image.tmdb.org/t/p/${size}${path}`;
+
+  const searchParams = new URLSearchParams({
+    path,
+    size,
+  });
+
+  return `/api/tmdb-image?${searchParams.toString()}`;
 }

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  extractApiKeyFromBearerToken,
   getEnvTmdbAuth,
   parseTmdbAuthInput,
   parseStoredTmdbAuth,
@@ -72,5 +73,13 @@ describe("tmdb-auth", () => {
       mode: "apiKey",
       value: "1234567890abcdef1234567890abcdef",
     });
+  });
+
+  it("extracts api key from tmdb bearer token payload", () => {
+    expect(
+      extractApiKeyFromBearerToken(
+        "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJmY2FmMjU3MTJiNmZiNTJjOGM5NDk1MmY1ZjEyZGI4NiIsIm5iZiI6MTc3NjE1MDEyNy4zNjgsInN1YiI6IjY5ZGRlNjZmZDU3MDZkZThhNzcwYjRkZSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.2mH7ZhRf2A5VITXWQ6q8jHRhoHhJpJX7-HZsQF3yUX0",
+      ),
+    ).toBe("fcaf25712b6fb52c8c94952f5f12db86");
   });
 });

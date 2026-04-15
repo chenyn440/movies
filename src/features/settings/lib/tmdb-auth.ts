@@ -12,6 +12,42 @@ export type TmdbAuthResolution = {
   source: "runtime" | "env" | "none";
 };
 
+function decodeBase64Url(value: string) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+
+  if (typeof globalThis.atob === "function") {
+    return globalThis.atob(padded);
+  }
+
+  return null;
+}
+
+export function extractApiKeyFromBearerToken(token: string) {
+  const trimmed = token.trim();
+  const parts = trimmed.split(".");
+  if (parts.length < 2) {
+    return null;
+  }
+
+  try {
+    const decoded = decodeBase64Url(parts[1]);
+    if (!decoded) {
+      return null;
+    }
+
+    const payload = JSON.parse(decoded) as {
+      aud?: unknown;
+    };
+
+    return typeof payload.aud === "string" && /^[a-z0-9]{32}$/i.test(payload.aud)
+      ? payload.aud
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function parseTmdbAuthInput(input: string): TmdbAuth | null {
   const trimmed = input.trim();
   if (!trimmed) {
@@ -65,6 +101,11 @@ export function getEnvTmdbAuth(): TmdbAuth | null {
     process.env.NEXT_PUBLIC_TMDB_BEARER_TOKEN?.trim() ||
     (process.env.NODE_ENV === "test" ? "" : DEFAULT_TMDB_BEARER_TOKEN);
   if (bearer) {
+    const derivedApiKey = extractApiKeyFromBearerToken(bearer);
+    if (derivedApiKey) {
+      return { mode: "apiKey", value: derivedApiKey };
+    }
+
     return { mode: "bearer", value: bearer };
   }
 
