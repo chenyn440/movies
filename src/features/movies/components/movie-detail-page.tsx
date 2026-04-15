@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import { getMovieDetail } from "@/features/movies/api/movie-service";
+import { getFallbackMovieDetail } from "@/features/movies/lib/fallback-movies";
 import { buildPosterUrl } from "@/features/movies/api/tmdb-client";
 import { useAppState } from "@/shared/providers/app-state";
 import { toAppError } from "@/shared/types/app-error";
@@ -17,8 +18,13 @@ type MovieDetailPageProps = {
 };
 
 export function MovieDetailPage({ movieId }: MovieDetailPageProps) {
-  const { auth, addMovieToWatchlist, removeMovieFromWatchlist, isInWatchlist } =
-    useAppState();
+  const {
+    auth,
+    addMovieToWatchlist,
+    removeMovieFromWatchlist,
+    isInWatchlist,
+    requireLogin,
+  } = useAppState();
   const inWatchlist = isInWatchlist(movieId);
   const authFingerprint = auth ? `${auth.mode}:${auth.value.slice(0, 6)}` : "none";
 
@@ -27,46 +33,56 @@ export function MovieDetailPage({ movieId }: MovieDetailPageProps) {
     enabled: Boolean(auth),
     queryFn: ({ signal }) => {
       if (!auth) {
-        throw new Error("TMDB auth is required.");
+        throw new Error("需要先设置 TMDB 验证。");
       }
       return getMovieDetail({ auth, id: movieId, signal });
     },
   });
+  const fallbackMovie = getFallbackMovieDetail(movieId);
 
   if (!auth) {
     return (
       <ErrorNotice
-        message="請先設定 TMDB 金鑰後再查看電影詳情。"
-        title="尚未設定 TMDB API Key"
+        message="请先设置 TMDB 密钥后再查看电影详情。"
+        title="尚未设置 TMDB 密钥"
       />
     );
   }
 
   if (result.isPending) {
-    return <LoadingIndicator label="電影詳情載入中..." />;
+    return <LoadingIndicator label="电影详情加载中..." />;
   }
 
-  if (result.error) {
+  if (result.error && !fallbackMovie) {
     const appError = toAppError(result.error);
     return (
       <ErrorNotice
         message={appError.message}
         onAction={() => void result.refetch()}
-        title="電影詳情載入失敗"
+        title="电影详情加载失败"
       />
     );
   }
 
-  if (!result.data) {
-    return <LoadingIndicator label="電影詳情載入中..." />;
+  if (!result.data && !fallbackMovie) {
+    return <LoadingIndicator label="电影详情加载中..." />;
   }
 
-  const movie = result.data;
+  const movie = result.data ?? fallbackMovie;
+  if (!movie) {
+    return <LoadingIndicator label="电影详情加载中..." />;
+  }
   const backdropUrl = buildPosterUrl(movie.backdropPath, "w1280");
   const posterUrl = buildPosterUrl(movie.posterPath, "w500");
 
   return (
     <section className="space-y-4">
+      {result.error && fallbackMovie ? (
+        <div className="glass-surface rounded-[var(--radius-md)] p-4 text-sm text-[var(--text-muted)]">
+          当前网络无法获取 TMDB 详情，已为你展示内置电影资料。
+        </div>
+      ) : null}
+
       <div className="glass-surface overflow-hidden rounded-[var(--radius-lg)]">
         {backdropUrl ? (
           <div className="relative h-52 w-full md:h-72">
@@ -95,7 +111,7 @@ export function MovieDetailPage({ movieId }: MovieDetailPageProps) {
               />
             ) : (
               <div className="flex aspect-[var(--poster-ratio)] items-center justify-center rounded-[var(--radius-md)] bg-white/8 text-sm text-[var(--text-soft)]">
-                No Poster
+                暂无海报
               </div>
             )}
           </div>
@@ -109,24 +125,26 @@ export function MovieDetailPage({ movieId }: MovieDetailPageProps) {
               <Badge>★ {formatRating(movie.voteAverage)}</Badge>
               <Badge>{formatReleaseDate(movie.releaseDate)}</Badge>
               <Badge>{formatRuntime(movie.runtime)}</Badge>
-              {movie.director ? <Badge>導演：{movie.director}</Badge> : null}
+              {movie.director ? <Badge>导演：{movie.director}</Badge> : null}
             </div>
             <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">
-              {movie.overview || "暫無簡介"}
+              {movie.overview || "暂无简介"}
             </p>
             <div className="mt-4 flex gap-2">
               <Button
                 onClick={() => {
-                  if (inWatchlist) {
-                    removeMovieFromWatchlist(movie.id);
-                    return;
-                  }
-                  addMovieToWatchlist(movie);
+                  requireLogin(() => {
+                    if (inWatchlist) {
+                      removeMovieFromWatchlist(movie.id);
+                      return;
+                    }
+                    addMovieToWatchlist(movie);
+                  });
                 }}
                 type="button"
                 variant={inWatchlist ? "secondary" : "primary"}
               >
-                {inWatchlist ? "已加入待看" : "加入待看清單"}
+                {inWatchlist ? "已加入待看" : "加入待看清单"}
               </Button>
             </div>
           </div>
@@ -135,9 +153,9 @@ export function MovieDetailPage({ movieId }: MovieDetailPageProps) {
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="glass-surface rounded-[var(--radius-md)] p-4">
-          <h2 className="text-3xl text-[var(--text)]">演員陣容</h2>
+          <h2 className="text-3xl text-[var(--text)]">演员阵容</h2>
           {movie.cast.length === 0 ? (
-            <p className="mt-2 text-sm text-[var(--text-muted)]">暫無演員資料</p>
+            <p className="mt-2 text-sm text-[var(--text-muted)]">暂无演员资料</p>
           ) : (
             <ul className="mt-2 grid gap-2 sm:grid-cols-2">
               {movie.cast.map((member) => (
@@ -156,9 +174,9 @@ export function MovieDetailPage({ movieId }: MovieDetailPageProps) {
         </div>
 
         <div className="glass-surface rounded-[var(--radius-md)] p-4">
-          <h2 className="text-3xl text-[var(--text)]">預告片</h2>
+          <h2 className="text-3xl text-[var(--text)]">预告片</h2>
           {movie.trailers.length === 0 ? (
-            <p className="mt-2 text-sm text-[var(--text-muted)]">暫無預告片</p>
+            <p className="mt-2 text-sm text-[var(--text-muted)]">暂无预告片</p>
           ) : (
             <ul className="mt-2 space-y-2">
               {movie.trailers.map((trailer) => (
@@ -179,9 +197,9 @@ export function MovieDetailPage({ movieId }: MovieDetailPageProps) {
       </div>
 
       <div className="glass-surface rounded-[var(--radius-md)] p-4">
-        <h2 className="text-3xl text-[var(--text)]">評論</h2>
+        <h2 className="text-3xl text-[var(--text)]">评论</h2>
         {movie.reviews.length === 0 ? (
-          <p className="mt-2 text-sm text-[var(--text-muted)]">暫無評論</p>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">暂无评论</p>
         ) : (
           <ul className="mt-2 space-y-3">
             {movie.reviews.map((review) => (
