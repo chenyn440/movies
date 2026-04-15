@@ -1,7 +1,7 @@
 "use client";
 
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getPopularMovies, searchMovies } from "@/features/movies/api/movie-service";
 import { MovieCard } from "@/features/movies/components/movie-card";
 import { cn } from "@/shared/lib/cn";
@@ -12,6 +12,7 @@ import { ErrorNotice } from "@/shared/ui/error-notice";
 import { Input } from "@/shared/ui/input";
 import { LoadingIndicator, MovieGridSkeleton } from "@/shared/ui/loading-indicator";
 import { getFallbackPopularMovies } from "@/features/movies/lib/fallback-movies";
+import { rememberMovies } from "@/features/movies/lib/movie-cache";
 
 type SearchSort = "default" | "rating_desc" | "release_desc" | "title_asc";
 const SORT_OPTIONS: Array<{ value: SearchSort; label: string }> = [
@@ -98,16 +99,30 @@ export function SearchPage() {
   const fallbackMovies = shouldUseFallbackPopular
     ? getFallbackPopularMovies().results
     : [];
-  const visibleMovies = [...(shouldUseFallbackPopular ? fallbackMovies : movies)];
-  if (sort === "rating_desc") {
-    visibleMovies.sort(
-      (a, b) => (b.voteAverage ?? Number.NEGATIVE_INFINITY) - (a.voteAverage ?? Number.NEGATIVE_INFINITY),
-    );
-  } else if (sort === "release_desc") {
-    visibleMovies.sort((a, b) => toDateScore(b.releaseDate) - toDateScore(a.releaseDate));
-  } else if (sort === "title_asc") {
-    visibleMovies.sort((a, b) => a.title.localeCompare(b.title, "zh-Hans-CN"));
-  }
+  const visibleMovies = useMemo(() => {
+    const nextMovies = [...(shouldUseFallbackPopular ? fallbackMovies : movies)];
+    if (sort === "rating_desc") {
+      nextMovies.sort(
+        (a, b) =>
+          (b.voteAverage ?? Number.NEGATIVE_INFINITY) -
+          (a.voteAverage ?? Number.NEGATIVE_INFINITY),
+      );
+    } else if (sort === "release_desc") {
+      nextMovies.sort(
+        (a, b) => toDateScore(b.releaseDate) - toDateScore(a.releaseDate),
+      );
+    } else if (sort === "title_asc") {
+      nextMovies.sort((a, b) => a.title.localeCompare(b.title, "zh-Hans-CN"));
+    }
+    return nextMovies;
+  }, [fallbackMovies, movies, shouldUseFallbackPopular, sort]);
+
+  useEffect(() => {
+    if (visibleMovies.length > 0) {
+      rememberMovies(visibleMovies);
+    }
+  }, [visibleMovies]);
+
   return (
     <section className="space-y-4">
       <header className="glass-surface rounded-[var(--radius-lg)] p-4 md:p-6">

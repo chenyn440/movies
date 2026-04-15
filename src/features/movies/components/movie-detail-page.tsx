@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import { getMovieDetail } from "@/features/movies/api/movie-service";
 import { getFallbackMovieDetail } from "@/features/movies/lib/fallback-movies";
+import { getCachedMovieDetail } from "@/features/movies/lib/movie-cache";
 import { buildPosterUrl } from "@/features/movies/api/tmdb-client";
 import { useAppState } from "@/shared/providers/app-state";
 import { toAppError } from "@/shared/types/app-error";
@@ -38,7 +39,7 @@ export function MovieDetailPage({ movieId }: MovieDetailPageProps) {
       return getMovieDetail({ auth, id: movieId, signal });
     },
   });
-  const fallbackMovie = getFallbackMovieDetail(movieId);
+  const fallbackMovie = getFallbackMovieDetail(movieId) ?? getCachedMovieDetail(movieId);
 
   if (!auth) {
     return (
